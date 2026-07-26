@@ -17,7 +17,8 @@ STAGING_TYPES: list[str] = [
     "text", "date", "text", "text", "text", "float8", "text", "text", "text[]",
 ]
 QUARANTINE_COLUMNS: tuple[str, ...] = ("source_file", "reject_reasons", "raw_payload")
-QUARANTINE_TYPES: list[str] = ["text", "text[]", "jsonb"]
+# QUARANTINE_TYPES: list[str] = ["text", "text[]", "jsonb"]
+QUARANTINE_TYPES: list[str] = ["text", "text[]", "text"]
 
 
 def connect(retries: int = 15, delay: float = 2.0) -> psycopg.Connection:

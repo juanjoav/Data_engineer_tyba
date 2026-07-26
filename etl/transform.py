@@ -9,6 +9,7 @@ import json
 from dataclasses import dataclass, field
 
 import pandas as pd
+import math
 
 from .quality import (
     FUNDS,
@@ -34,6 +35,14 @@ class BatchResult:
     rejected: pd.DataFrame
     rule_hits: dict[str, int] = field(default_factory=dict)
 
+def to_json_payloads(frame: pd.DataFrame) -> list[str]:
+    records = frame.to_dict("records")
+    for record in records:
+        for key, value in record.items():
+            if isinstance(value, float) and not math.isfinite(value):
+                record[key] = None
+    return [json.dumps(r, ensure_ascii=False, default=str, allow_nan=False)
+            for r in records]
 
 def normalize(raw: pd.DataFrame) -> pd.DataFrame:
     out = pd.DataFrame(index=raw.index)
@@ -70,14 +79,14 @@ def validate(norm: pd.DataFrame, raw: pd.DataFrame) -> BatchResult:
             reasons[mask] = reasons[mask].map(lambda lst, c=rule.code: lst + [c])
             rejected_mask |= mask
 
-    # Se persiste el payload CRUDO: si el registro se rechazó, la
-    # normalización pudo ser justamente lo que falló.
+    # Se persiste el payload CRUDO: si el registro se rechazó, la normalización pudo ser justamente lo que falló.
     rejected = pd.DataFrame({
         "reject_reasons": reasons[rejected_mask],
-        "raw_payload": [
-            json.dumps(record, ensure_ascii=False, default=str)
-            for record in raw[rejected_mask.values].to_dict("records")
-        ],
+        # "raw_payload": [
+        #     json.dumps(record, ensure_ascii=False, default=str)
+        #     for record in raw[rejected_mask.values].to_dict("records")
+        # ],
+        "raw_payload": to_json_payloads(raw[rejected_mask.values]),
     })
 
     valid = norm[~rejected_mask].copy()
@@ -89,8 +98,7 @@ def validate(norm: pd.DataFrame, raw: pd.DataFrame) -> BatchResult:
             hits[rule.code] = int(mask.sum())
             flags[mask] = flags[mask].map(lambda lst, c=rule.code: lst + [c])
 
-    # El signo lo dicta `type`; `amount` guarda solo la magnitud, de modo que
-    # el invariante "amount >= 0" lo verifica un CHECK en la base.
+    # El signo lo dicta `type`; `amount` guarda solo la magnitud
     valid["amount"] = valid["amount"].abs().round(2)
     valid["commercial_name"] = valid["commercial_name"].fillna(SIN_ENTIDAD)
     valid["movement_date"] = valid["movement_date"].dt.date

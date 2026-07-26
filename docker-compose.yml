@@ -1,0 +1,37 @@
+# docker compose up --build
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: etl
+      POSTGRES_PASSWORD: etl
+      POSTGRES_DB: movimientos
+    volumes:
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U etl -d movimientos -q"]
+      interval: 3s
+      retries: 20
+    ports:
+      - "5432:5432"
+
+  etl:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGDATABASE: movimientos
+      PGUSER: etl
+      PGPASSWORD: etl
+      DATA_DIR: /app/data
+      BASE_DATE: "2024-10-15"
+    volumes:
+      - ./data:/app/data:ro
+    restart: "no"
+
+volumes:
+  pgdata:
